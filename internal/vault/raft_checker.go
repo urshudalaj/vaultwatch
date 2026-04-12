@@ -1,38 +1,30 @@
 package vault
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 )
 
-// RaftStatus holds the parsed response from the Vault raft autopilot state endpoint.
+// RaftStatus holds the Raft cluster status returned by Vault.
 type RaftStatus struct {
-	Healthy          bool              `json:"healthy"`
-	OptimisticFailureTolerance int    `json:"optimistic_failure_tolerance"`
-	Servers          map[string]RaftServer `json:"servers"`
+	LeaderID        string `json:"leader_id"`
+	AppliedIndex    uint64 `json:"applied_index"`
+	CommitIndex     uint64 `json:"commit_index"`
+	FSMPending      uint64 `json:"fsm_pending"`
+	LastContact     string `json:"last_contact"`
+	NumPeers        int    `json:"num_peers"`
+	ProtocolVersion int    `json:"protocol_version"`
 }
 
-// RaftServer represents a single server entry in the raft cluster.
-type RaftServer struct {
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	Address string `json:"address"`
-	Status  string `json:"status"`
-	Leader  bool   `json:"leader"`
-	Voter   bool   `json:"voter"`
-	Healthy bool   `json:"healthy"`
-}
-
-// RaftChecker queries Vault's raft autopilot state.
+// RaftChecker queries the Vault Raft storage backend status.
 type RaftChecker struct {
 	client *http.Client
 	baseURL string
 	token   string
 }
 
-// NewRaftChecker creates a new RaftChecker.
+// NewRaftChecker returns a new RaftChecker.
 func NewRaftChecker(baseURL, token string, client *http.Client) *RaftChecker {
 	if client == nil {
 		client = http.DefaultClient
@@ -40,10 +32,10 @@ func NewRaftChecker(baseURL, token string, client *http.Client) *RaftChecker {
 	return &RaftChecker{client: client, baseURL: baseURL, token: token}
 }
 
-// CheckRaft returns the current raft autopilot status from Vault.
-func (r *RaftChecker) CheckRaft(ctx context.Context) (*RaftStatus, error) {
-	url := fmt.Sprintf("%s/v1/sys/storage/raft/autopilot/state", r.baseURL)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+// CheckRaft fetches the Raft status from Vault.
+func (r *RaftChecker) CheckRaft() (*RaftStatus, error) {
+	url := fmt.Sprintf("%s/v1/sys/storage/raft/status", r.baseURL)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("raft checker: build request: %w", err)
 	}
@@ -51,7 +43,7 @@ func (r *RaftChecker) CheckRaft(ctx context.Context) (*RaftStatus, error) {
 
 	resp, err := r.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("raft checker: do request: %w", err)
+		return nil, fmt.Errorf("raft checker: request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -59,9 +51,11 @@ func (r *RaftChecker) CheckRaft(ctx context.Context) (*RaftStatus, error) {
 		return nil, fmt.Errorf("raft checker: unexpected status %d", resp.StatusCode)
 	}
 
-	var status RaftStatus
-	if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
+	var payload struct {
+		Data RaftStatus `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
 		return nil, fmt.Errorf("raft checker: decode response: %w", err)
 	}
-	return &status, nil
+	return &payload.Data, nil
 }
