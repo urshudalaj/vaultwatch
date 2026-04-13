@@ -17,6 +17,17 @@ type TransitKeyInfo struct {
 	LatestVersion   int
 }
 
+// NeedsRotation returns true if the key has never been rotated beyond version 1.
+func (k *TransitKeyInfo) NeedsRotation() bool {
+	return k.LatestVersion <= 1
+}
+
+// HasKeyDrift returns true if old key versions are still allowed for decryption,
+// meaning MinDecryptVersion is behind LatestVersion.
+func (k *TransitKeyInfo) HasKeyDrift() bool {
+	return k.MinDecryptVersion < k.LatestVersion
+}
+
 // TransitChecker reads transit key metadata from Vault.
 type TransitChecker struct {
 	client *http.Client
