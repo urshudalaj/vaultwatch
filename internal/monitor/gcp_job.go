@@ -39,18 +39,25 @@ func (j *GCPJob) Run() {
 			continue
 		}
 
-		if info.TTL == "" {
-			j.notifier.Send(Alert{
-				Level:   Warning,
-				Message: fmt.Sprintf("GCP roleset %s/%s has no TTL configured", t.Mount, t.Roleset),
-			})
-		}
+		j.checkRoleset(t, info)
+	}
+}
 
-		if info.MaxTTL == "" {
-			j.notifier.Send(Alert{
-				Level:   Warning,
-				Message: fmt.Sprintf("GCP roleset %s/%s has no MaxTTL configured", t.Mount, t.Roleset),
-			})
-		}
+// checkRoleset inspects a single GCP roleset and sends alerts for any missing
+// TTL fields. Extracting this logic makes Run easier to follow and allows
+// individual rolesets to be tested in isolation.
+func (j *GCPJob) checkRoleset(t GCPJobConfig, info *vault.GCPRoleInfo) {
+	if info.TTL == "" {
+		j.notifier.Send(Alert{
+			Level:   Warning,
+			Message: fmt.Sprintf("GCP roleset %s/%s has no TTL configured", t.Mount, t.Roleset),
+		})
+	}
+
+	if info.MaxTTL == "" {
+		j.notifier.Send(Alert{
+			Level:   Warning,
+			Message: fmt.Sprintf("GCP roleset %s/%s has no MaxTTL configured", t.Mount, t.Roleset),
+		})
 	}
 }
