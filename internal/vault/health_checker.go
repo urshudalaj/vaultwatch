@@ -16,9 +16,14 @@ type HealthStatus struct {
 	ClusterName string `json:"cluster_name"`
 }
 
+// IsHealthy returns true if Vault is initialized, unsealed, and not in standby.
+func (s *HealthStatus) IsHealthy() bool {
+	return s.Initialized && !s.Sealed && !s.Standby
+}
+
 // HealthChecker queries the Vault health endpoint.
 type HealthChecker struct {
-	client *http.Client
+	client  *http.Client
 	baseURL string
 }
 
