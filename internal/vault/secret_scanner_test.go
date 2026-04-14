@@ -80,3 +80,19 @@ func TestReadLeaseInfo_ReturnsLease(t *testing.T) {
 		t.Error("expected renewable to be true")
 	}
 }
+
+func TestReadLeaseInfo_NotFound(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/secret/missing", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]interface{}{"errors": []string{"secret not found"}})
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	scanner := NewSecretScanner(newTestAPIClient(t, srv.URL))
+	_, _, _, err := scanner.ReadLeaseInfo(context.Background(), "secret/missing")
+	if err == nil {
+		t.Fatal("expected error for missing secret, got nil")
+	}
+}
