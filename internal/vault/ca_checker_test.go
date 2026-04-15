@@ -67,3 +67,18 @@ func TestCheckCA_ErrorOnBadStatus(t *testing.T) {
 		t.Fatal("expected error on non-200 status")
 	}
 }
+
+func TestCheckCA_ExpirationIsInFuture(t *testing.T) {
+	expiry := time.Now().Add(90 * 24 * time.Hour).Unix()
+	srv := newCAMockServer(t, "pki", expiry, http.StatusOK)
+	defer srv.Close()
+
+	checker := NewCAChecker(srv.URL, "test-token", nil)
+	info, err := checker.CheckCA("pki")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !info.Expiration.After(time.Now()) {
+		t.Errorf("expected expiration to be in the future, got %s", info.Expiration)
+	}
+}
