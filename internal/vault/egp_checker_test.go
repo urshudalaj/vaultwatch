@@ -52,6 +52,31 @@ func TestGetEGP_ReturnsInfo(t *testing.T) {
 	}
 }
 
+func TestGetEGP_ReturnsPaths(t *testing.T) {
+	policy := vault.EGPPolicy{
+		Name:             "allow-finance",
+		Paths:            []string{"secret/finance/*", "secret/shared/*"},
+		EnforcementLevel: "soft-mandatory",
+		Code:             `main = rule { true }`,
+	}
+	srv := newEGPMockServer(t, "allow-finance", policy, http.StatusOK)
+	defer srv.Close()
+
+	checker := newEGPAPIClient(t, srv)
+	got, err := checker.GetEGP("allow-finance")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got.Paths) != len(policy.Paths) {
+		t.Fatalf("expected %d paths, got %d", len(policy.Paths), len(got.Paths))
+	}
+	for i, p := range policy.Paths {
+		if got.Paths[i] != p {
+			t.Errorf("expected path[%d] %q, got %q", i, p, got.Paths[i])
+		}
+	}
+}
+
 func TestGetEGP_ErrorOnEmptyName(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
